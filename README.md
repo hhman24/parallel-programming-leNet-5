@@ -24,10 +24,14 @@ The overall learning objectives for this project are:
 #  Background knowledge
 
 1 . Convolution Neural Networks (CNNs)
-    * Standford [cheatsheat](https://stanford.edu/~shervine/teaching/cs-230/cheatsheet-convolutional-neural-networks#overview)
-    * Video CNNs: ["How Convolutional Neural Networks work"](https://www.youtube.com/watch?v=FmpDIaiMIeA)
+
+* Standford [cheatsheat](https://stanford.edu/~shervine/teaching/cs-230/cheatsheet-convolutional-neural-networks#overview)
+  
+* Video CNNs: ["How Convolutional Neural Networks work"](https://www.youtube.com/watch?v=FmpDIaiMIeA)
+  
 2 . Lenet-5
-    * A Complete Guide: [here](https://www.kaggle.com/code/blurredmachine/lenet-architecture-a-complete-guide/notebook)
+  
+* A Complete Guide: [here](https://www.kaggle.com/code/blurredmachine/lenet-architecture-a-complete-guide/notebook)
 
 # Dataset
 
