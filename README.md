@@ -2,7 +2,7 @@
 Parallel Programming Final Project #HCMUS #CNN #LeNet-5
 
 # Member
-|Họ và tên        |MSSV    |    
+|Name       |MSSV    |    
 |:----------------|:------:|
 |Hoàng Hữu Minh An|20127102|
 |Trần Tiến Hoàng  |20127424|
