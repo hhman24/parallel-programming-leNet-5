@@ -1,4 +1,4 @@
-#include "./src/helper/support.h"
+#include "src/support.h"
 
 int main(int argc, char** argv) {
     printDeviceInfo();
