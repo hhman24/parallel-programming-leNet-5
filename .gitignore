@@ -1,82 +1,81 @@
 ### C ###
 # Prerequisites
-*.d
+# *.d
 
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
+# # Object files
+# *.ko
+# *.obj
+# *.elf
 
-# Linker output
-*.ilk
-*.map
-*.exp
+# # Linker output
+# *.ilk
+# *.map
+# *.exp
 
-# Precompiled Headers
-*.gch
-*.pch
+# # Precompiled Headers
+# *.gch
+# *.pch
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
+# # Libraries
+# *.lib
+# *.a
+# *.la
+# *.lo
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
+# # Shared objects (inc. Windows DLLs)
+# *.dll
+# *.so
+# *.so.*
+# *.dylib
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
+# # Executables
+# *.exe
+# *.out
+# *.app
+# *.i*86
+# *.x86_64
+# *.hex
 
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
+# # Debug files
+# *.dSYM/
+# *.su
+# *.idb
+# *.pdb
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+# # Kernel Module Compile Results
+# *.mod*
+# *.cmd
+# .tmp_versions/
+# modules.order
+# Module.symvers
+# Mkfile.old
+# dkms.conf
 
-### C++ ###
-# Prerequisites
+# ### C++ ###
+# # Prerequisites
 
-# Compiled Object files
-*.slo
+# # Compiled Object files
+# *.slo
 
-# Precompiled Headers
+# # Precompiled Headers
 
-# Compiled Dynamic libraries
+# # Compiled Dynamic libraries
 
-# Fortran module files
-*.mod
-*.smod
+# # Fortran module files
+# *.mod
+# *.smod
 
-# Compiled Static libraries
-*.lai
+# # Compiled Static libraries
+# *.lai
 
-# Executables
+# # Executables
 
-### CUDA ###
-*.i
-*.ii
-*.gpu
-*.ptx
-*.cubin
-*.fatbin01~
+# ### CUDA ###
+# *.i
+# *.ii
+# *.gpu
+# *.ptx
+# *.cubin
+# *.fatbin01~
 
 /build
