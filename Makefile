@@ -4,6 +4,6 @@ suport.o: src/suport.cu
 infoGPU.o: infoGPU.cu
 		nvcc --compile infoGPU.cu -I ../libgputk/ -I./
 
-infoGPU: infoGPU.o custom
+infoGPU: infoGPU.o
 		nvcc -o infoGPU -lm -lcuda -lrt infoGPU.o
 
