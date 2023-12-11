@@ -11,6 +11,7 @@ int ReverseInt(int i) {
 
 void MNIST::read_mnist_data(std::string filename, Matrix& data) {
   std::ifstream file(filename, std::ios::binary);
+  std::cout<<"Reading: "<<filename<<std::endl;
   if (file.is_open()) {
     int magic_number = 0;
     int number_of_images = 0;
@@ -41,6 +42,7 @@ void MNIST::read_mnist_data(std::string filename, Matrix& data) {
 
 void MNIST::read_mnist_label(std::string filename, Matrix& labels) {
   std::ifstream file(filename, std::ios::binary);
+  std::cout<<"Reading: "<<filename<<std::endl;
   if (file.is_open()) {
     int magic_number = 0;
     int number_of_images = 0;
