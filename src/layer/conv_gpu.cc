@@ -61,8 +61,6 @@ void Conv_GPU::forward(const Matrix &bottom)
     int n_sample = bottom.cols();
     top.resize(height_out * width_out * channel_out, n_sample);
     data_cols.resize(n_sample);
-
-    
 }
 
 // col2im, used for grad_bottom
