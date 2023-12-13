@@ -1,12 +1,3 @@
-
-infoGPU: infoGPU.o custom
-	nvcc -o infoGPU -lm -lcuda -lrt infoGPU.o src/layer/custom/*.o -I./ -L/usr/local/cuda/lib64 -lcudart
-
-infoGPU.o: infoGPU.cc
-	nvcc --compile infoGPU.cc  -I./ -L/usr/local/cuda/lib64 -lcudart  
-
-############################################################################
-
 demo: demo.o custom
 	nvcc -o demo -lm -lcuda -lrt demo.o src/network.o src/mnist.o src/layer/*.o src/loss/*.o src/layer/custom/*.o src/optimizer/*.o -I./ -L/usr/local/cuda/lib64 -lcudart
 

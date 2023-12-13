@@ -58,7 +58,7 @@ void trainModel(int n_epoch, int batch_size)
 int main(int argc, char *argv[])
 {
 
-    trainModel(1, 128);
+    trainModel(5, 128);
 
     return 0;
 }
