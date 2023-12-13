@@ -3,7 +3,7 @@
 
 #include <vector>
 #include "../layer.h"
-#include "./custom/gpu-support.h"
+#include "custom/gpu-support.h"
 
 class Conv_GPU : public Layer
 {
