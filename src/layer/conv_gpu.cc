@@ -2,6 +2,8 @@
 #include <math.h>
 #include <iostream>
 
+#define TILE_WIDTH 16
+
 void Conv_GPU::init()
 {
     height_out = (1 + (height_in - height_kernel + 2 * pad_h) / stride);
@@ -18,54 +20,59 @@ void Conv_GPU::init()
     // std::cout << weight.colwise().sum() + bias.transpose() << std::endl;
 }
 
-// im2col, used for bottom
-// image size: Vector (height_in * width_in * channel_in)
-// data_col size: Matrix (hw_out, hw_kernel * channel_in)
-void Conv_GPU::im2col(const Vector &image, Matrix &data_col)
-{
-    int hw_in = height_in * width_in;
-    int hw_kernel = height_kernel * width_kernel;
-    int hw_out = height_out * width_out;
-    // im2col
-    data_col.resize(hw_out, hw_kernel * channel_in);
-    for (int c = 0; c < channel_in; c++)
-    {
-        Vector map = image.block(hw_in * c, 0, hw_in, 1); // c-th channel map
-        for (int i = 0; i < hw_out; i++)
-        {
-            int step_h = i / width_out;
-            int step_w = i % width_out;
-            int start_idx = step_h * width_in * stride + step_w * stride; // left-top idx of window
-            for (int j = 0; j < hw_kernel; j++)
-            {
-                int cur_col = start_idx % width_in + j % width_kernel - pad_w; // col after padding
-                int cur_row = start_idx / width_in + j / width_kernel - pad_h;
-                if (cur_col < 0 || cur_col >= width_in || cur_row < 0 ||
-                    cur_row >= height_in)
-                {
-                    data_col(i, c * hw_kernel + j) = 0;
-                }
-                else
-                {
-                    // int pick_idx = start_idx + (j / width_kernel) * width_in + j % width_kernel;
-                    int pick_idx = cur_row * width_in + cur_col;
-                    data_col(i, c * hw_kernel + j) = map(pick_idx); // pick which pixel
-                }
-            }
-        }
-    }
-}
-
 void Conv_GPU::forward(const Matrix &bottom)
 {
     int n_sample = bottom.cols();
     top.resize(height_out * width_out * channel_out, n_sample);
-    data_cols.resize(n_sample);
+    float *x = (float *)bottom.data();
+    float *y = (float *)top.data();
+    float *k = (float *)weight.data();
+    float *b = (float *)bias.data();
+
+    const int B = n_sample;
+    const int M = channel_out;
+    const int C = channel_in;
+    const int K = height_kernel; // Assuming width_kernel is also K
+
+    float *x_d;
+    float *y_d;
+    float *k_d;
+    GPUInterface gpuInterface;
+    std::cout << "Conv-GPU==" << std::endl;
+
+    // Launch marker kernel to aid with student function timing
+    gpuInterface.insert_pre_barrier_kernel();
+
+    // Start layer timer
+    auto start_time_layer = std::chrono::high_resolution_clock::now();
+    // Data transfer CPU to GPU
+    gpuInterface.conv_forward_gpu_prolog(y, x, k, &y_d, &x_d, &k_d, B, M, C, height_in, width_in, K);
+
+    // Start kernel timer
+    auto start_time_kernel = std::chrono::high_resolution_clock::now();
+    // Hand off to GPU for computation
+    gpuInterface.conv_forward_gpu(y_d, x_d, k_d, B, M, C, height_in, width_in, K);
+    cudaDeviceSynchronize();
+    // Stop kernel timer
+    auto end_time_kernel = std::chrono::high_resolution_clock::now();
+
+    // Data transfer GPU to CPU
+    gpuInterface.conv_forward_gpu_epilog(y, y_d, x_d, k_d, B, M, C, height_in, width_in, K);
+
+    // Stop layer timer
+    auto end_time_layer = std::chrono::high_resolution_clock::now();
+
+    // Launch barrier kernel to aid with timing with nsight-compute
+    gpuInterface.insert_post_barrier_kernel();
+
+    std::chrono::duration<float, std::milli> duration_kernel = (end_time_kernel - start_time_kernel);
+    std::cout << "\t - Kernel Time: " << duration_kernel.count() << " ms" << std::endl;
+    
+    std::chrono::duration<float, std::milli> duration_layer = (end_time_layer - start_time_layer);
+    std::cout << "\t - Layer Time: " << duration_layer.count() << " ms" << std::endl;
+ 
 }
 
-// col2im, used for grad_bottom
-// data_col size: Matrix (hw_out, hw_kernel * channel_in)
-// image size: Vector (height_in * width_in * channel_in)
 void Conv_GPU::col2im(const Matrix &data_col, Vector &image)
 {
     int hw_in = height_in * width_in;

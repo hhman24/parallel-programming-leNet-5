@@ -4,6 +4,7 @@
 
 #include "src/layer.h"
 #include "src/layer/conv.h"
+#include "src/layer/conv_gpu.h"
 #include "src/layer/fully_connected.h"
 #include "src/layer/ave_pooling.h"
 #include "src/layer/max_pooling.h"
@@ -17,9 +18,14 @@
 #include "src/network.h"
 #include "src/optimizer.h"
 #include "src/optimizer/sgd.h"
+#include "src/layer/custom/gpu-support.h"
+
 
 int main()
 {
+    // Check GPU
+    GPU_Support gpu_support;
+    gpu_support.printDeviceInfo();    
     // data
     MNIST dataset("./data/fashion/");
     dataset.read();
@@ -27,8 +33,8 @@ int main()
     int dim_in = dataset.train_data.rows();
     std::cout << "mnist train number: " << n_train << std::endl;
     std::cout << "mnist test number: " << dataset.test_labels.cols() << std::endl;
-    // dnn
-    Network dnn;
+    // dnn1
+    Network dnn1;
     Layer *conv1 = new Conv(1, 28, 28, 6, 5, 5);
     Layer *pool1 = new MaxPooling(6, 24, 24, 2, 2, 2);
     Layer *conv2 = new Conv(6, 12, 12, 16, 5, 5);
@@ -41,29 +47,70 @@ int main()
     Layer *relu_fc1 = new ReLU;
     Layer *relu_fc2 = new ReLU;
     Layer *softmax = new Softmax;
-    dnn.add_layer(conv1);
-    dnn.add_layer(relu_conv1);
-    dnn.add_layer(pool1);
-    dnn.add_layer(conv2);
-    dnn.add_layer(relu_conv2);
-    dnn.add_layer(pool2);
-    dnn.add_layer(fc1);
-    dnn.add_layer(relu_fc1);
-    dnn.add_layer(fc2);
-    dnn.add_layer(relu_fc2);
-    dnn.add_layer(fc3);
-    dnn.add_layer(softmax);
+    dnn1.add_layer(conv1);
+    dnn1.add_layer(relu_conv1);
+    dnn1.add_layer(pool1);
+    dnn1.add_layer(conv2);
+    dnn1.add_layer(relu_conv2);
+    dnn1.add_layer(pool2);
+    dnn1.add_layer(fc1);
+    dnn1.add_layer(relu_fc1);
+    dnn1.add_layer(fc2);
+    dnn1.add_layer(relu_fc2);
+    dnn1.add_layer(fc3);
+    dnn1.add_layer(softmax);
     // loss
     Loss *loss = new CrossEntropy;
-    dnn.add_loss(loss);
+    dnn1.add_loss(loss);
 
     // Load parameters
-    dnn.load_parameters("./model/weights-cpu-trained.bin");
+    std::cout << "Loading parameters (weights-cpu-trained.bin)..." << std::endl;
+    dnn1.load_parameters("./model/weights-cpu-trained.bin");
 
     // test accuracy
-    dnn.forward(dataset.test_data);
-    float accuracy = compute_accuracy(dnn.output(), dataset.test_labels);
+    dnn1.forward(dataset.test_data);
+    float accuracy = compute_accuracy(dnn1.output(), dataset.test_labels);
     std::cout << "test accuracy: " << accuracy << std::endl;
 
+    std::cout << "==============================" << std::endl;
+
+    // dnn2
+    Network dnn2;
+    Layer *dnn2_conv1 = new Conv_GPU(1, 28, 28, 6, 5, 5);
+    Layer *dnn2_pool1 = new MaxPooling(6, 24, 24, 2, 2, 2);
+    Layer *dnn2_conv2 = new Conv_GPU(6, 12, 12, 16, 5, 5);
+    Layer *dnn2_pool2 = new MaxPooling(16, 8, 8, 2, 2, 2);
+    Layer *dnn2_fc1 = new FullyConnected(pool2->output_dim(), 120);
+    Layer *dnn2_fc2 = new FullyConnected(120, 84);
+    Layer *dnn2_fc3 = new FullyConnected(84, 10);
+    Layer *dnn2_relu_conv1 = new ReLU;
+    Layer *dnn2_relu_conv2 = new ReLU;
+    Layer *dnn2_relu_fc1 = new ReLU;
+    Layer *dnn2_relu_fc2 = new ReLU;
+    Layer *dnn2_softmax = new Softmax;
+    dnn2.add_layer(dnn2_conv1);
+    dnn2.add_layer(dnn2_relu_conv1);
+    dnn2.add_layer(dnn2_pool1);
+    dnn2.add_layer(dnn2_conv2);
+    dnn2.add_layer(dnn2_relu_conv2);
+    dnn2.add_layer(dnn2_pool2);
+    dnn2.add_layer(dnn2_fc1);
+    dnn2.add_layer(dnn2_relu_fc1);
+    dnn2.add_layer(dnn2_fc2);
+    dnn2.add_layer(dnn2_relu_fc2);
+    dnn2.add_layer(dnn2_fc3);
+    dnn2.add_layer(dnn2_softmax);
+    // loss
+    Loss *dnn2_loss = new CrossEntropy;
+    dnn2.add_loss(dnn2_loss);
+
+    // Load parameters
+    std::cout << "Loading parameters (weights-cpu-trained.bin)..." << std::endl;
+    dnn2.load_parameters("./model/weights-cpu-trained.bin");
+
+    // test accuracy
+    dnn2.forward(dataset.test_data);
+    accuracy = compute_accuracy(dnn2.output(), dataset.test_labels);
+    std::cout << "test accuracy: " << accuracy << std::endl;
     return 0;
 }

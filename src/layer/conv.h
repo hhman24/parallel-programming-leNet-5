@@ -3,6 +3,9 @@
 
 #include <vector>
 #include "../layer.h"
+#include <math.h>
+#include <iostream>
+#include <chrono>
 
 class Conv: public Layer {
  private:

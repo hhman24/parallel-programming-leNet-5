@@ -143,12 +143,12 @@ void Network::load_parameters(std::string filename) {
   int layer_size = 0;
 
   in.read(reinterpret_cast<char*>(&n_layer), sizeof(int));
-  std::cout<<"Num Layers: "<<n_layer<<std::endl;
+  // std::cout<<"Num Layers: "<<n_layer<<std::endl;
   res.reserve(n_layer);
 
   for (int i=0; i<n_layer; i++){
     in.read(reinterpret_cast<char*>(&layer_size), sizeof(int));
-    std::cout<<"Layer "<<i<<" size: "<<layer_size<<std::endl;
+    // std::cout<<"Layer "<<i<<" size: "<<layer_size<<std::endl;
     std::vector<float> layer_params;
     layer_params.reserve(layer_size);
     for (int j=0; j<layer_size; j++)

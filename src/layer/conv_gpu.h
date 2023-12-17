@@ -4,8 +4,9 @@
 #include <vector>
 #include <chrono>
 #include "../layer.h"
-#include <cuda_runtime_api.h>
 #include "./custom/gpu-support.h"
+#include "./custom/gpu-new-forward.h"
+
 
 class Conv_GPU : public Layer
 {

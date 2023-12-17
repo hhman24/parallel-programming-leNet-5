@@ -1,6 +1,8 @@
 #include "conv.h"
 #include <math.h>
 #include <iostream>
+#include <chrono>
+#include <vector>
 
 void Conv::init() {
   height_out = (1 + (height_in - height_kernel + 2 * pad_h) / stride);
@@ -53,6 +55,8 @@ void Conv::forward(const Matrix& bottom) {
   int n_sample = bottom.cols();
   top.resize(height_out * width_out * channel_out, n_sample);
   data_cols.resize(n_sample);
+  std::cout << "Conv-GPU==" << std::endl;
+  auto start_time_layer = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < n_sample; i ++) {
     // im2col
     Matrix data_col;
@@ -63,6 +67,9 @@ void Conv::forward(const Matrix& bottom) {
     result.rowwise() += bias.transpose();
     top.col(i) = Eigen::Map<Vector>(result.data(), result.size());
   }
+  auto end_time_layer = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<float, std::milli> duration_layer = (end_time_layer - start_time_layer);
+  std::cout << "\t - Layer Time: " << duration_layer.count() << " ms" << std::endl;
 }
 
 // col2im, used for grad_bottom
