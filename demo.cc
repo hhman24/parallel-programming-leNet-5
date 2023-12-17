@@ -23,9 +23,14 @@
 #include "src/network.h"
 #include "src/optimizer.h"
 #include "src/optimizer/sgd.h"
+#include "src/layer/custom/gpu-support.h"
 
 int main()
 {
+  // Check GPU
+  GPU_Support gpu_support;
+  gpu_support.printDeviceInfo();
+
   // data
   MNIST dataset("./data/fashion/");
   dataset.read();
@@ -69,6 +74,7 @@ int main()
   const int batch_size = 128;
   for (int epoch = 0; epoch < n_epoch; epoch++)
   {
+    dnn.save_parameters("./model/weights-86.bin");
     shuffle_data(dataset.train_data, dataset.train_labels);
     for (int start_idx = 0; start_idx < n_train; start_idx += batch_size)
     {
@@ -101,7 +107,8 @@ int main()
     std::cout << epoch + 1 << "-th epoch, test acc: " << acc << std::endl;
     std::cout << std::endl;
   }
-  
+
+  dnn.save_parameters("./model/weights-86.bin");
   
   return 0;
 }

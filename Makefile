@@ -42,7 +42,19 @@ optimizer: src/optimizer/sgd.cc
 	nvcc --compile src/optimizer/sgd.cc -o src/optimizer/sgd.o -I./ -L/usr/local/cuda/lib64 -lcudart
 
 clean:
-	rm -f infoGPU infoGPU.o demo demo.o
+	rm -f infoGPU demo main
+
+clean_o:
+	rm -f *.o src/*.o src/layer/*.o src/loss/*.o src/optimizer/*.o src/layer/custom/*.o
+
+setup:
+	make clean_o
+	make clean
+	make network.o
+	make mnist.o
+	make layer
+	make loss
+	make optimizer
 
 run: demo
 	./demo
