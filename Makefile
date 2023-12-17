@@ -1,8 +1,22 @@
-demo: demo.o custom
-	nvcc -o demo -lm -lcuda -lrt demo.o src/network.o src/mnist.o src/layer/*.o src/loss/*.o src/layer/custom/*.o src/optimizer/*.o -I./ -L/usr/local/cuda/lib64 -lcudart
+##############################################################################
+test_cpu.o: test_cpu.cc
+	nvcc --compile test_cpu.cc -I./ -L/usr/local/cuda/lib64 -lcudart
 
-demo.o: demo.cc
-	nvcc --compile demo.cc -I./ -L/usr/local/cuda/lib64 -lcudart
+test_cpu: test_cpu.o
+	nvcc -o test_cpu -lm -lcuda -lrt test_cpu.o src/network.o src/mnist.o src/layer/*.o src/loss/*.o src/optimizer/*.o -I./ -L/usr/local/cuda/lib64 -lcudart
+
+test: test_cpu
+	./test_cpu
+##############################################################################
+
+train_cpu: train_cpu.o 
+	nvcc -o train_cpu -lm -lcuda -lrt train_cpu.o src/network.o src/mnist.o src/layer/*.o src/loss/*.o src/optimizer/*.o -I./ -L/usr/local/cuda/lib64 -lcudart
+
+train_cpu.o: train_cpu.cc
+	nvcc --compile train_cpu.cc -I./ -L/usr/local/cuda/lib64 -lcudart
+
+train: train_cpu
+	./train_cpu
 
 ############################################################################
 
@@ -42,7 +56,7 @@ optimizer: src/optimizer/sgd.cc
 	nvcc --compile src/optimizer/sgd.cc -o src/optimizer/sgd.o -I./ -L/usr/local/cuda/lib64 -lcudart
 
 clean:
-	rm -f infoGPU demo main
+	rm -f infoGPU demo main train_cpu test_cpu
 
 clean_o:
 	rm -f *.o src/*.o src/layer/*.o src/loss/*.o src/optimizer/*.o src/layer/custom/*.o
