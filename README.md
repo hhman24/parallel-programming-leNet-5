@@ -21,6 +21,16 @@ We will use the Fashion MNIST dataset, where the inputs to the network will be a
 The overall learning objectives for this project are:
  - Demonstrating command of CUDA and optimization approaches by designing and implementing an optimized neural-network convolutional layer forward pass
 
+# Usage
+### Linux
+```shell
+git clone https://github.com/hhman24/parallel-programming-leNet-5
+cd parallel-programming-leNet-5
+make setup
+make custom1
+make test
+```
+
 #  Background knowledge
 
 1 . Convolution Neural Networks (CNNs)

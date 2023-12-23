@@ -2,6 +2,8 @@
 #include <math.h>
 #include <iostream>
 
+#define TILE_WIDTH 16
+
 void Conv_GPU::init()
 {
     height_out = (1 + (height_in - height_kernel + 2 * pad_h) / stride);
@@ -18,54 +20,43 @@ void Conv_GPU::init()
     // std::cout << weight.colwise().sum() + bias.transpose() << std::endl;
 }
 
-// im2col, used for bottom
-// image size: Vector (height_in * width_in * channel_in)
-// data_col size: Matrix (hw_out, hw_kernel * channel_in)
-void Conv_GPU::im2col(const Vector &image, Matrix &data_col)
-{
-    int hw_in = height_in * width_in;
-    int hw_kernel = height_kernel * width_kernel;
-    int hw_out = height_out * width_out;
-    // im2col
-    data_col.resize(hw_out, hw_kernel * channel_in);
-    for (int c = 0; c < channel_in; c++)
-    {
-        Vector map = image.block(hw_in * c, 0, hw_in, 1); // c-th channel map
-        for (int i = 0; i < hw_out; i++)
-        {
-            int step_h = i / width_out;
-            int step_w = i % width_out;
-            int start_idx = step_h * width_in * stride + step_w * stride; // left-top idx of window
-            for (int j = 0; j < hw_kernel; j++)
-            {
-                int cur_col = start_idx % width_in + j % width_kernel - pad_w; // col after padding
-                int cur_row = start_idx / width_in + j / width_kernel - pad_h;
-                if (cur_col < 0 || cur_col >= width_in || cur_row < 0 ||
-                    cur_row >= height_in)
-                {
-                    data_col(i, c * hw_kernel + j) = 0;
-                }
-                else
-                {
-                    // int pick_idx = start_idx + (j / width_kernel) * width_in + j % width_kernel;
-                    int pick_idx = cur_row * width_in + cur_col;
-                    data_col(i, c * hw_kernel + j) = map(pick_idx); // pick which pixel
-                }
-            }
-        }
-    }
-}
-
 void Conv_GPU::forward(const Matrix &bottom)
 {
     int n_sample = bottom.cols();
     top.resize(height_out * width_out * channel_out, n_sample);
-    data_cols.resize(n_sample);
+    float *input_data = (float *)bottom.data();
+    float *output_data = (float *)top.data();
+    float *weight_data = (float *)weight.data();
+
+    const int num_samples = n_sample;
+    const int input_channel = channel_in;
+    const int output_channel = channel_out;
+    const int kernel_height = height_kernel; // Assuming width_kernel is also K
+
+    GPUInterface gpuInterface;
+    std::cout << "Convolution - GPU:" << std::endl;
+
+    // Launch marker kernel to aid with student function timing
+    // gpuInterface.insert_pre_barrier_kernel();
+
+    // Start layer timer
+    GpuTimer timer;
+	timer.Start();
+    gpuInterface.conv_forward_gpu_full(output_data, input_data, weight_data,
+                                    num_samples, output_channel, input_channel,
+                                    height_in, width_in, kernel_height);
+
+    // Stop layer timer
+    timer.Stop();
+	float duration_layer = timer.Elapsed();
+
+    // Launch barrier kernel to aid with timing with nsight-compute
+    // gpuInterface.insert_post_barrier_kernel();
+    
+    std::cout << "\t - Layer Time: " << duration_layer << " ms" << std::endl;
+ 
 }
 
-// col2im, used for grad_bottom
-// data_col size: Matrix (hw_out, hw_kernel * channel_in)
-// image size: Vector (height_in * width_in * channel_in)
 void Conv_GPU::col2im(const Matrix &data_col, Vector &image)
 {
     int hw_in = height_in * width_in;

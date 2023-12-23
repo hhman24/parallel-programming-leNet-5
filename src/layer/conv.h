@@ -3,6 +3,11 @@
 
 #include <vector>
 #include "../layer.h"
+#include <math.h>
+#include <iostream>
+#include <chrono>
+#include "./custom/gpu-support.h"
+
 
 class Conv: public Layer {
  private:

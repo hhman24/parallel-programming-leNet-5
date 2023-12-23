@@ -79,3 +79,5 @@
 # *.fatbin01~
 
 /build
+*.o
+*.out

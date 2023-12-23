@@ -1,5 +1,5 @@
-#ifndef LAYER_CUSTOM_GPU_SUPPORT_H
-#define LAYER_CUSTOM_GPU_SUPPORT_H
+#ifndef SRC_LAYER_CUSTOM_GPU_SUPPORT_H
+#define SRC_LAYER_CUSTOM_GPU_SUPPORT_H
 #pragma once
 
 #include <stdio.h>
