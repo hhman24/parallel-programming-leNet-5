@@ -26,9 +26,10 @@ The overall learning objectives for this project are:
 ```shell
 git clone https://github.com/hhman24/parallel-programming-leNet-5
 cd parallel-programming-leNet-5
+make clean
 make setup
-make custom1
-make test
+make custom0
+make test_model
 ```
 
 #  Background knowledge

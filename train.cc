@@ -70,7 +70,7 @@ int main()
   // train & test
   SGD opt(0.001, 5e-4, 0.9, true);
   // SGD opt(0.001);
-  const int n_epoch = 5;
+  const int n_epoch = 7;
   const int batch_size = 128;
   for (int epoch = 0; epoch < n_epoch; epoch++)
   {
@@ -90,7 +90,9 @@ int main()
         dnn.check_gradient(x_batch, target_batch, 10);
       }
       dnn.forward(x_batch);
+      std::cout << "forward done" << std::endl;
       dnn.backward(x_batch, target_batch);
+      std::cout << "backward done" << std::endl;
       // display
       if (ith_batch % 50 == 0)
       {
