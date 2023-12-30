@@ -2,7 +2,6 @@
 #include <math.h>
 #include <iostream>
 
-#define TILE_WIDTH 16
 
 void Conv_GPU::init()
 {
@@ -34,7 +33,10 @@ void Conv_GPU::forward(const Matrix &bottom)
     const int kernel_height = height_kernel; // Assuming width_kernel is also K
 
     GPUInterface gpuInterface;
-    std::cout << "Convolution - GPU:" << std::endl;
+    if(input_channel == 1)
+        std::cout << "Convolution c1 - GPU";
+    else
+        std::cout << "Convolution c3 - GPU";
 
     // Launch marker kernel to aid with student function timing
     // gpuInterface.insert_pre_barrier_kernel();

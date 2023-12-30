@@ -50,20 +50,30 @@ custom0:
 	nvcc -arch=sm_75 --compile src/layer/custom/gpu-support.cu -o src/layer/custom/gpu-support.o -I./ -L/usr/local/cuda/lib64 -lcudart 
 	nvcc -arch=sm_75 --compile src/layer/custom/gpu-new-forward.cu -o src/layer/custom/gpu-new-forward.o -I./ -L/usr/local/cuda/lib64 -lcudart
 
+# ---------------------------------------------
+# An:
 custom1: 
 	rm -f src/layer/custom/*.o
 	nvcc -arch=sm_75 --compile src/layer/custom/gpu-support.cu -o src/layer/custom/gpu-support.o -I./ -L/usr/local/cuda/lib64 -lcudart 
 	nvcc -arch=sm_75 --compile src/layer/custom/gpu-new-forward1.cu -o src/layer/custom/gpu-new-forward.o -I./ -L/usr/local/cuda/lib64 -lcudart
+# An.
 
+# ---------------------------------------------
+# Phat:
 custom2: 
 	rm -f src/layer/custom/*.o
 	nvcc -arch=sm_75 --compile src/layer/custom/gpu-support.cu -o src/layer/custom/gpu-support.o -I./ -L/usr/local/cuda/lib64 -lcudart 
 	nvcc -arch=sm_75 --compile src/layer/custom/gpu-new-forward2.cu -o src/layer/custom/gpu-new-forward.o -I./ -L/usr/local/cuda/lib64 -lcudart
+# Phat.
 
+# ---------------------------------------------
+# Hoang:
 custom3: 
 	rm -f src/layer/custom/*.o
 	nvcc -arch=sm_75 --compile src/layer/custom/gpu-support.cu -o src/layer/custom/gpu-support.o -I./ -L/usr/local/cuda/lib64 -lcudart 
 	nvcc -arch=sm_75 --compile src/layer/custom/gpu-new-forward3.cu -o src/layer/custom/gpu-new-forward.o -I./ -L/usr/local/cuda/lib64 -lcudart
+# Hoang.
+# ---------------------------------------------
 
 loss: src/loss/cross_entropy_loss.cc src/loss/mse_loss.cc
 	nvcc -arch=sm_75 --compile src/loss/cross_entropy_loss.cc -o src/loss/cross_entropy_loss.o -I./ -L/usr/local/cuda/lib64 -lcudart
