@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iostream>
 
+#define TILE_WIDTH 16
 #define MAX_OUTPUT_KERNEL 16
 #define MAX_INPUT_KERNEL 6
 #define KERNEL_WIDTH 5
@@ -62,13 +63,13 @@ __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const floa
     const int width_out = width_in - kernel_height + 1;
 
     // Allocate device memory
-    float *device_input, *device_output, *device_weight;
+    float *device_input, *device_output;
     cudaMalloc((void **)&device_input, num_samples * input_channel * height_in * width_in * sizeof(float));     // input features map is input_channel
     cudaMalloc((void **)&device_output, num_samples * output_channel * height_out * width_out * sizeof(float)); // output feature map is output_channel
 
     // Copy input and mask data to device
     cudaMemcpy(device_input, input_data, num_samples * input_channel * height_in * width_in * sizeof(float), cudaMemcpyHostToDevice);
-    CHECK(cudaMemcpyToSymbol(dc_filter, weight_data, output_channel * input_channel * kernel_height * kernel_height * sizeof(float)));
+    cudaMemcpyToSymbol(dc_filter, weight_data, output_channel * input_channel * kernel_height * kernel_height * sizeof(float));
 
     // Set the kernel dimensions and call the kernel
     int height_grid = ceil(1.0 * height_out / TILE_WIDTH);
