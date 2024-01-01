@@ -6,13 +6,13 @@
 #define TILE_WIDTH_SHARED_C1 16
 #define TILE_WIDTH_SHARED_C3 12
 
-__constant__ float deviceMaskData[3200];
+__constant__ float deviceMaskData[2400];
 
 __global__ void conv_forward_kernel(float* output, const float* input, const int num_samples,
                                     const int output_channel, const int input_channel,
                                     const int height, const int width, const int kernel_size)
 {
-    int TILE_WIDTH_SHARED = TILE_WIDTH_CONST;
+    int TILE_WIDTH_SHARED;
     if (input_channel == 1){
         TILE_WIDTH_SHARED = TILE_WIDTH_SHARED_C1;
     }
@@ -25,9 +25,7 @@ __global__ void conv_forward_kernel(float* output, const float* input, const int
     const int H_out = height - kernel_size + 1;
     const int W_out = width - kernel_size + 1;
 
-    int H_grid = ceil(1.0 * H_out / TILE_WIDTH_SHARED);
     int W_grid = ceil(1.0 * W_out / TILE_WIDTH_SHARED);
-    int Z = H_grid * W_grid;
 
     int b = blockIdx.x;                 // batch number
     int m = blockIdx.y;                 // output feature
@@ -39,14 +37,10 @@ __global__ void conv_forward_kernel(float* output, const float* input, const int
 
     int startOfTile_h = (blockIdx.z / W_grid) * TILE_WIDTH_SHARED; // row of the input image matrix
     int startOfTile_w = (blockIdx.z % W_grid) * TILE_WIDTH_SHARED; // col of the input image matrix
-
-    #pragma unroll
     for (int c = 0; c < input_channel; c++)
     {
-        #pragma unroll
         for(int i = ty; i < TILE_WIDTH_SHARED + kernel_size - 1; i += TILE_WIDTH_SHARED)
         {
-            #pragma unroll
             for(int j = tx; j < TILE_WIDTH_SHARED + kernel_size - 1; j += TILE_WIDTH_SHARED)
             {
                 if (startOfTile_h + i < height && startOfTile_w + j < width)
@@ -56,18 +50,14 @@ __global__ void conv_forward_kernel(float* output, const float* input, const int
             }
         }
     }
-
     __syncthreads();
 
     if ((h < H_out) && (w < W_out)) 
     {
         float accum = 0.0f;
-        #pragma unroll
         for(int c=0; c<input_channel; c++)             // sum over all input features
         {
-            #pragma unroll
             for(int p=0; p< kernel_size; p++)         // KxK filter 
-                #pragma unroll
                 for(int q=0; q< kernel_size; q++)
                     accum += shared_input[c * (TILE_WIDTH_SHARED + kernel_size - 1) * (TILE_WIDTH_SHARED + kernel_size - 1) + (p+ty) * (TILE_WIDTH_SHARED + kernel_size - 1) + (q+tx)] * deviceMaskData[m * (input_channel * kernel_size * kernel_size) + c * (kernel_size * kernel_size) + p * kernel_size + q]; 
         }
@@ -79,7 +69,7 @@ __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const floa
                                                   const int num_samples, const int output_channel, const int input_channel,
                                                   const int height_in, const int width_in, const int kernel_height)
 {
-    int TILE_WIDTH_SHARED = TILE_WIDTH_CONST;
+    int TILE_WIDTH_SHARED;
     if (input_channel == 1){
         TILE_WIDTH_SHARED = TILE_WIDTH_SHARED_C1;
     }
@@ -95,24 +85,19 @@ __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const floa
     int outputSize = num_samples * output_channel * H_out * W_out * sizeof(float);
     int maskSize = output_channel * input_channel * kernel_height * kernel_height * sizeof(float);
 
-    float *device_input, *device_output, *device_kernel;
+    float *device_input, *device_output;
 
     cudaMalloc((void **)&device_input, inputSize);
     cudaMalloc((void **)&device_output, outputSize);
-    cudaMalloc((void **)&device_kernel, maskSize);
 
     cudaMemcpy(device_input, input_data, inputSize, cudaMemcpyHostToDevice);
     cudaMemcpyToSymbol(deviceMaskData, weight_data, maskSize);
 
-    int H_grid, W_grid, Z;  
     dim3 numThreadsPerBlock, numBlocksInGrid;
 
-    H_grid = ceil(1.0 * H_out / TILE_WIDTH_SHARED);
-    W_grid = ceil(1.0 * W_out / TILE_WIDTH_SHARED);
-    Z = H_grid * W_grid;
     numThreadsPerBlock = dim3(TILE_WIDTH_SHARED, TILE_WIDTH_SHARED, 1);
     int shmem_size = input_channel * (TILE_WIDTH_SHARED + kernel_height - 1) * (TILE_WIDTH_SHARED + kernel_height - 1) * sizeof(float);
-    numBlocksInGrid = dim3(num_samples, output_channel, Z);
+    numBlocksInGrid = dim3(num_samples, output_channel, ceil(1.0 * H_out / TILE_WIDTH_SHARED)*ceil(1.0 * W_out / TILE_WIDTH_SHARED));
     
     conv_forward_kernel<<<numBlocksInGrid, numThreadsPerBlock, shmem_size>>>(device_output, device_input, num_samples, output_channel, input_channel, height_in, width_in, kernel_height);
 
@@ -120,5 +105,4 @@ __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const floa
 
     cudaFree(device_input);
     cudaFree(device_output);
-    cudaFree(device_kernel);
 }
