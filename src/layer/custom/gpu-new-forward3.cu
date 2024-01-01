@@ -1,82 +1,77 @@
-// Tran Tien Hoang - 20127424
 #include "./gpu-new-forward.h"
 #include <cmath>
 #include <iostream>
 
-#define TILE_WIDTH 16
-#define KERNEL_SIZE_MAX 5 // Assume maximum kernel size is 5x5
+#define TILE_WIDTH_CONST 16
+#define TILE_WIDTH_SHARED_C1 16
+#define TILE_WIDTH_SHARED_C3 12
 
-__global__ void conv_forward_kernel(float *output, const float *input, const float *kernel,
-                                    const int num_samples, const int output_channel, const int input_channel,
+__constant__ float deviceMaskData[3200];
+
+__global__ void conv_forward_kernel(float* output, const float* input, const int num_samples,
+                                    const int output_channel, const int input_channel,
                                     const int height, const int width, const int kernel_size)
 {
-    const int height_out = height - kernel_size + 1;
-    const int width_out = width - kernel_size + 1;
-
-    int height_grid = ceil(1.0 * height_out / TILE_WIDTH);
-    int width_grid = ceil(1.0 * width_out / TILE_WIDTH); 
-
-    // Declare shared memory for input tile and kernel tile
-    __shared__ float input_tile[TILE_WIDTH + KERNEL_SIZE_MAX - 1][TILE_WIDTH + KERNEL_SIZE_MAX - 1];
-    __shared__ float kernel_tile[KERNEL_SIZE_MAX][KERNEL_SIZE_MAX];
-
-    // Calculate block and thread indices
-    int batch_idx = blockIdx.x;
-    int output_feature_idx = blockIdx.y;
-    int block_z = blockIdx.z;
-    int block_row = block_z / width_grid;
-    int block_col = block_z % width_grid;
-    int row_idx = block_row * TILE_WIDTH + threadIdx.y;
-    int col_idx = block_col * TILE_WIDTH + threadIdx.x;
-
-    float accumulator = 0.0f;
-
-    // Iterate over input channels
-    for (int input_channel_idx = 0; input_channel_idx < input_channel; input_channel_idx++)
-    {
-        // Copy input tile to shared memory
-        if (row_idx < height && col_idx < width)
-        {
-            input_tile[threadIdx.y][threadIdx.x] = input[(batch_idx * (input_channel * height * width)) +
-                                                         (input_channel_idx * (height * width)) +
-                                                         (row_idx * width) +
-                                                         col_idx];
-        }
-        else
-        {
-            input_tile[threadIdx.y][threadIdx.x] = 0.0f;
-        }
-
-        // Copy kernel tile to shared memory
-        if (threadIdx.y < kernel_size && threadIdx.x < kernel_size)
-        {
-            kernel_tile[threadIdx.y][threadIdx.x] = kernel[(output_feature_idx * (input_channel * kernel_size * kernel_size)) +
-                                                           (input_channel_idx * (kernel_size * kernel_size)) +
-                                                           (threadIdx.y * kernel_size) +
-                                                           threadIdx.x];
-        }
-
-        __syncthreads();
-
-        // Convolution computation using shared memory
-        for (int k_row = 0; k_row < kernel_size; k_row++)
-        {
-            for (int k_col = 0; k_col < kernel_size; k_col++)
-            {
-                accumulator += input_tile[threadIdx.y + k_row][threadIdx.x + k_col] * kernel_tile[k_row][k_col];
-            }
-        }
-
-        __syncthreads();
+    int TILE_WIDTH_SHARED = TILE_WIDTH_CONST;
+    if (input_channel == 1){
+        TILE_WIDTH_SHARED = TILE_WIDTH_SHARED_C1;
+    }
+    else{
+        TILE_WIDTH_SHARED = TILE_WIDTH_SHARED_C3;
     }
 
-    // Store result in output
-    if (row_idx < height_out && col_idx < width_out)
+    extern __shared__ float shared_input[];
+
+    const int H_out = height - kernel_size + 1;
+    const int W_out = width - kernel_size + 1;
+
+    int H_grid = ceil(1.0 * H_out / TILE_WIDTH_SHARED);
+    int W_grid = ceil(1.0 * W_out / TILE_WIDTH_SHARED);
+    int Z = H_grid * W_grid;
+
+    int b = blockIdx.x;                 // batch number
+    int m = blockIdx.y;                 // output feature
+    int ty = threadIdx.y;               // thread ID in the current TILE  
+    int tx = threadIdx.x;
+    
+    int h = (blockIdx.z / W_grid) * TILE_WIDTH_SHARED + ty; // row of the input image matrix
+    int w = (blockIdx.z % W_grid) * TILE_WIDTH_SHARED + tx; // col of the input image matrix
+
+    int startOfTile_h = (blockIdx.z / W_grid) * TILE_WIDTH_SHARED; // row of the input image matrix
+    int startOfTile_w = (blockIdx.z % W_grid) * TILE_WIDTH_SHARED; // col of the input image matrix
+
+    #pragma unroll
+    for (int c = 0; c < input_channel; c++)
     {
-        output[(batch_idx * (output_channel * height_out * width_out)) +
-               (output_feature_idx * (height_out * width_out)) +
-               (row_idx * width_out) +
-               col_idx] = accumulator;
+        #pragma unroll
+        for(int i = ty; i < TILE_WIDTH_SHARED + kernel_size - 1; i += TILE_WIDTH_SHARED)
+        {
+            #pragma unroll
+            for(int j = tx; j < TILE_WIDTH_SHARED + kernel_size - 1; j += TILE_WIDTH_SHARED)
+            {
+                if (startOfTile_h + i < height && startOfTile_w + j < width)
+                {
+                    shared_input[c * (TILE_WIDTH_SHARED + kernel_size - 1) * (TILE_WIDTH_SHARED + kernel_size - 1) + i * (TILE_WIDTH_SHARED + kernel_size - 1) + j] = input[b * (input_channel * height * width) + c * (height * width) + (startOfTile_h + i) * width + startOfTile_w + j];
+                }
+            }
+        }
+    }
+
+    __syncthreads();
+
+    if ((h < H_out) && (w < W_out)) 
+    {
+        float accum = 0.0f;
+        #pragma unroll
+        for(int c=0; c<input_channel; c++)             // sum over all input features
+        {
+            #pragma unroll
+            for(int p=0; p< kernel_size; p++)         // KxK filter 
+                #pragma unroll
+                for(int q=0; q< kernel_size; q++)
+                    accum += shared_input[c * (TILE_WIDTH_SHARED + kernel_size - 1) * (TILE_WIDTH_SHARED + kernel_size - 1) + (p+ty) * (TILE_WIDTH_SHARED + kernel_size - 1) + (q+tx)] * deviceMaskData[m * (input_channel * kernel_size * kernel_size) + c * (kernel_size * kernel_size) + p * kernel_size + q]; 
+        }
+        output[b * (output_channel * H_out * W_out) + m * (H_out * W_out) + h * W_out + w] = accum;
     }
 }
 
@@ -84,34 +79,46 @@ __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const floa
                                                   const int num_samples, const int output_channel, const int input_channel,
                                                   const int height_in, const int width_in, const int kernel_height)
 {
-    const int height_out = height_in - kernel_height + 1;
-    const int width_out = width_in - kernel_height + 1;
+    int TILE_WIDTH_SHARED = TILE_WIDTH_CONST;
+    if (input_channel == 1){
+        TILE_WIDTH_SHARED = TILE_WIDTH_SHARED_C1;
+    }
+    else{
+        TILE_WIDTH_SHARED = TILE_WIDTH_SHARED_C3;
+    }
+    std::cout << ". Combined Optimization:\n";
 
-    // Allocate device memory
-    float *device_input, *device_output, *device_weight;
-    cudaMalloc((void **)&device_input, num_samples * input_channel * height_in * width_in * sizeof(float));              // input features map is input_channel
-    cudaMalloc((void **)&device_output, num_samples * output_channel * height_out * width_out * sizeof(float));          // output feature map is output_channel
-    cudaMalloc((void **)&device_weight, output_channel * input_channel * kernel_height * kernel_height * sizeof(float)); // input_channel * output_channel filter Maps of size kernel_height * kernel_height
+    const int H_out = height_in - kernel_height + 1;
+    const int W_out = width_in - kernel_height + 1;
 
-    // Copy input and mask data to device
-    cudaMemcpy(device_input, input_data, num_samples * input_channel * height_in * width_in * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(device_weight, weight_data, output_channel * input_channel * kernel_height * kernel_height * sizeof(float), cudaMemcpyHostToDevice);
+    int inputSize = num_samples * input_channel * height_in * width_in * sizeof(float);
+    int outputSize = num_samples * output_channel * H_out * W_out * sizeof(float);
+    int maskSize = output_channel * input_channel * kernel_height * kernel_height * sizeof(float);
 
-    // Set the kernel dimensions and call the kernel
-    int height_grid = ceil(1.0 * height_out / TILE_WIDTH);
-    int width_grid = ceil(1.0 * width_out / TILE_WIDTH);
-    int Z = height_grid * width_grid;
-    dim3 num_threads_per_block(TILE_WIDTH, TILE_WIDTH, 1);
-    dim3 num_blocks_in_grid(num_samples, output_channel, Z);
+    float *device_input, *device_output, *device_kernel;
 
-    // Launch the kernel
-    conv_forward_kernel<<<num_blocks_in_grid, num_threads_per_block>>>(device_output, device_input, device_weight, num_samples, output_channel, input_channel, height_in, width_in, kernel_height);
+    cudaMalloc((void **)&device_input, inputSize);
+    cudaMalloc((void **)&device_output, outputSize);
+    cudaMalloc((void **)&device_kernel, maskSize);
 
-    // Copy the output back to host
-    cudaMemcpy(output_data, device_output, num_samples * output_channel * height_out * width_out * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(device_input, input_data, inputSize, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(deviceMaskData, weight_data, maskSize);
 
-    // Free device memory
+    int H_grid, W_grid, Z;  
+    dim3 numThreadsPerBlock, numBlocksInGrid;
+
+    H_grid = ceil(1.0 * H_out / TILE_WIDTH_SHARED);
+    W_grid = ceil(1.0 * W_out / TILE_WIDTH_SHARED);
+    Z = H_grid * W_grid;
+    numThreadsPerBlock = dim3(TILE_WIDTH_SHARED, TILE_WIDTH_SHARED, 1);
+    int shmem_size = input_channel * (TILE_WIDTH_SHARED + kernel_height - 1) * (TILE_WIDTH_SHARED + kernel_height - 1) * sizeof(float);
+    numBlocksInGrid = dim3(num_samples, output_channel, Z);
+    
+    conv_forward_kernel<<<numBlocksInGrid, numThreadsPerBlock, shmem_size>>>(device_output, device_input, num_samples, output_channel, input_channel, height_in, width_in, kernel_height);
+
+    cudaMemcpy(output_data, device_output, outputSize, cudaMemcpyDeviceToHost);
+
     cudaFree(device_input);
     cudaFree(device_output);
-    cudaFree(device_weight);
+    cudaFree(device_kernel);
 }
