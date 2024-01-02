@@ -11,6 +11,8 @@ __global__ void conv_forward_kernel(float *output, const float *input, const flo
     const int height_out = height - kernel_size + 1;
     const int width_out = width - kernel_size + 1;
     
+    int width_grid = ceil(1.0 * width_out / TILE_WIDTH);
+    
     int batch_idx = blockIdx.x;        // batch number
     int output_feature_idx = blockIdx.y; // output feature
     int row_idx = (blockIdx.z / width_grid) * TILE_WIDTH + threadIdx.y; // row of the image matrix
