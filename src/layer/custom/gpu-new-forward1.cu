@@ -1,14 +1,10 @@
-// Hoang Huu Minh An - 20127102
 #include "./gpu-new-forward.h"
 #include <cmath>
 #include <iostream>
 
 #define TILE_WIDTH 16
-#define MAX_OUTPUT_KERNEL 16
-#define MAX_INPUT_KERNEL 6
-#define KERNEL_WIDTH 5
 
-__constant__ float dc_filter[MAX_OUTPUT_KERNEL * MAX_INPUT_KERNEL * KERNEL_WIDTH * KERNEL_WIDTH];
+__constant__ float dc_filter[2400];
 
 __global__ void conv_forward_kernel(float *output, const float *input, const int num_samples,
                                     const int output_channel, const int input_channel,
@@ -16,9 +12,6 @@ __global__ void conv_forward_kernel(float *output, const float *input, const int
 {
     const int height_out = height - kernel_size + 1;
     const int width_out = width - kernel_size + 1;
-
-    int height_grid = ceil(1.0 * height_out / TILE_WIDTH);
-    int width_grid = ceil(1.0 * width_out / TILE_WIDTH);
 
     int batch_idx = blockIdx.x;                                         // batch number
     int output_feature_idx = blockIdx.y;                                // output feature
@@ -72,9 +65,7 @@ __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const floa
     cudaMemcpyToSymbol(dc_filter, weight_data, output_channel * input_channel * kernel_height * kernel_height * sizeof(float));
 
     // Set the kernel dimensions and call the kernel
-    int height_grid = ceil(1.0 * height_out / TILE_WIDTH);
-    int width_grid = ceil(1.0 * width_out / TILE_WIDTH);
-    int Z = height_grid * width_grid;
+    int Z = ceil(1.0 * height_out / TILE_WIDTH) * ceil(1.0 * width_out / TILE_WIDTH);
     dim3 num_threads_per_block(TILE_WIDTH, TILE_WIDTH, 1);
     dim3 num_blocks_in_grid(num_samples, output_channel, Z);
 

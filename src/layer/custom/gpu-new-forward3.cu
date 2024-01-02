@@ -1,117 +1,137 @@
-// Tran Tien Hoang - 20127424
 #include "./gpu-new-forward.h"
 #include <cmath>
 #include <iostream>
 
-#define TILE_WIDTH 16
-#define KERNEL_SIZE_MAX 5 // Assume maximum kernel size is 5x5
+#define TILE_WIDTH_C1 16
+#define TILE_WIDTH_C3 12
 
-__global__ void conv_forward_kernel(float *output, const float *input, const float *kernel,
-                                    const int num_samples, const int output_channel, const int input_channel,
+__constant__ float deviceMaskData[2400];
+
+
+__global__ void conv_forward_kernel(float* output, const float* input, const float* kernel, 
+                                    const int num_samples, const int output_channel, const int input_channel, 
                                     const int height, const int width, const int kernel_size)
 {
-    const int height_out = height - kernel_size + 1;
-    const int width_out = width - kernel_size + 1;
+    int TILE_WIDTH;    
+    if (input_channel == 1){
+        TILE_WIDTH = TILE_WIDTH_C1;
+    }
+    else{
+        TILE_WIDTH = TILE_WIDTH_C3;
+    }
+    extern __shared__ float shared_input[];
+    const int INPUT_TILE_WIDTH = TILE_WIDTH + kernel_size -1;
+    
+    const int H_out = height - kernel_size + 1;
+    const int W_out = width - kernel_size + 1;
 
-    int height_grid = ceil(1.0 * height_out / TILE_WIDTH);
-    int width_grid = ceil(1.0 * width_out / TILE_WIDTH); 
 
-    // Declare shared memory for input tile and kernel tile
-    __shared__ float input_tile[TILE_WIDTH + KERNEL_SIZE_MAX - 1][TILE_WIDTH + KERNEL_SIZE_MAX - 1];
-    __shared__ float kernel_tile[KERNEL_SIZE_MAX][KERNEL_SIZE_MAX];
+#define y4d(i3, i2, i1, i0) output[(i3) * (output_channel * H_out * W_out) + (i2) * (H_out * W_out) + (i1) * (W_out) + i0]
+#define x4d(i3, i2, i1, i0) input[(i3) * (input_channel * height * width) + (i2) * (height * width) + (i1) * (width) + i0]
+#define k4d(i3, i2, i1, i0) deviceMaskData[(i3) * (input_channel * kernel_size * kernel_size) + (i2) * (kernel_size * kernel_size) + (i1) * (kernel_size) + i0]
+#define sm3d(i2, i1, i0) shared_input[(i2) * (INPUT_TILE_WIDTH * INPUT_TILE_WIDTH) + (i1) * INPUT_TILE_WIDTH + i0]
 
-    // Calculate block and thread indices
-    int batch_idx = blockIdx.x;
-    int output_feature_idx = blockIdx.y;
-    int block_z = blockIdx.z;
-    int block_row = block_z / width_grid;
-    int block_col = block_z % width_grid;
-    int row_idx = block_row * TILE_WIDTH + threadIdx.y;
-    int col_idx = block_col * TILE_WIDTH + threadIdx.x;
+    int W_grid = ceil(1.0*W_out / TILE_WIDTH); 
+    int b = blockIdx.x;                 // batch number
+    int m = blockIdx.y;                 // output feature
+    
+    int ty = threadIdx.y;              // thread ID in the current TILE  
+    int tx = threadIdx.x;
+    
+    int h = (blockIdx.z / W_grid) * TILE_WIDTH + ty; // row of the input image matrix
+    int w = (blockIdx.z % W_grid) * TILE_WIDTH + tx; // col of the input image matrix'
 
-    float accumulator = 0.0f;
+    int startOfTile_h = (blockIdx.z / W_grid) * TILE_WIDTH; // row of the input image matrix
+    int startOfTile_w = (blockIdx.z % W_grid) * TILE_WIDTH; // col of the input image matrix'
 
-    // Iterate over input channels
-    for (int input_channel_idx = 0; input_channel_idx < input_channel; input_channel_idx++)
+    #pragma unroll
+    for (int c = 0; c < input_channel; c++)
     {
-        // Copy input tile to shared memory
-        if (row_idx < height && col_idx < width)
+        #pragma unroll
+        for(int i = ty; i < INPUT_TILE_WIDTH; i += TILE_WIDTH)
         {
-            input_tile[threadIdx.y][threadIdx.x] = input[(batch_idx * (input_channel * height * width)) +
-                                                         (input_channel_idx * (height * width)) +
-                                                         (row_idx * width) +
-                                                         col_idx];
-        }
-        else
-        {
-            input_tile[threadIdx.y][threadIdx.x] = 0.0f;
-        }
-
-        // Copy kernel tile to shared memory
-        if (threadIdx.y < kernel_size && threadIdx.x < kernel_size)
-        {
-            kernel_tile[threadIdx.y][threadIdx.x] = kernel[(output_feature_idx * (input_channel * kernel_size * kernel_size)) +
-                                                           (input_channel_idx * (kernel_size * kernel_size)) +
-                                                           (threadIdx.y * kernel_size) +
-                                                           threadIdx.x];
-        }
-
-        __syncthreads();
-
-        // Convolution computation using shared memory
-        for (int k_row = 0; k_row < kernel_size; k_row++)
-        {
-            for (int k_col = 0; k_col < kernel_size; k_col++)
+            #pragma unroll
+            for(int j = tx; j < INPUT_TILE_WIDTH; j += TILE_WIDTH)
             {
-                accumulator += input_tile[threadIdx.y + k_row][threadIdx.x + k_col] * kernel_tile[k_row][k_col];
+                if (startOfTile_h + i < height && startOfTile_w + j < width)
+                {
+                    sm3d(c, i, j) = x4d(b, c, startOfTile_h + i, startOfTile_w + j);
+                }
             }
         }
-
-        __syncthreads();
     }
 
-    // Store result in output
-    if (row_idx < height_out && col_idx < width_out)
+    // Make sure all threads loaded data into shared memory
+    __syncthreads();
+
+    // compute only within bounds
+    if ((h < H_out) && (w < W_out)) 
     {
-        output[(batch_idx * (output_channel * height_out * width_out)) +
-               (output_feature_idx * (height_out * width_out)) +
-               (row_idx * width_out) +
-               col_idx] = accumulator;
-    }
+        float accum = 0.0f;
+        #pragma unroll
+        for(int c=0; c<input_channel; c++)             // sum over all input features
+        {
+            #pragma unroll
+            for(int p=0; p< kernel_size; p++)         // KxK filter 
+                #pragma unroll
+                for(int q=0; q< kernel_size; q++)
+                    accum += sm3d(c, p+ty, q+tx) * k4d(m, c, p, q); 
+        }
+        y4d(b,m,h,w) = accum;
+    } 
+    
+    #undef sm4d
+    #undef y4d
+    #undef x4d
+    #undef k4d
 }
 
 __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const float *input_data, const float *weight_data,
                                                   const int num_samples, const int output_channel, const int input_channel,
                                                   const int height_in, const int width_in, const int kernel_height)
 {
-    const int height_out = height_in - kernel_height + 1;
-    const int width_out = width_in - kernel_height + 1;
+    // Set the tile width
+    int TILE_WIDTH;    
+    if (input_channel == 1){
+        TILE_WIDTH = TILE_WIDTH_C1;
+    }
+    else{
+        TILE_WIDTH = TILE_WIDTH_C3;
+    }
+    std::cout << ". Optimize 02:\n";
 
-    // Allocate device memory
-    float *device_input, *device_output, *device_weight;
-    cudaMalloc((void **)&device_input, num_samples * input_channel * height_in * width_in * sizeof(float));              // input features map is input_channel
-    cudaMalloc((void **)&device_output, num_samples * output_channel * height_out * width_out * sizeof(float));          // output feature map is output_channel
-    cudaMalloc((void **)&device_weight, output_channel * input_channel * kernel_height * kernel_height * sizeof(float)); // input_channel * output_channel filter Maps of size kernel_height * kernel_height
+    // Allocate memory and copy over the relevant data structures to the GPU
+    const int H_out = height_in - kernel_height + 1;
+    const int W_out = width_in - kernel_height + 1;
 
-    // Copy input and mask data to device
-    cudaMemcpy(device_input, input_data, num_samples * input_channel * height_in * width_in * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(device_weight, weight_data, output_channel * input_channel * kernel_height * kernel_height * sizeof(float), cudaMemcpyHostToDevice);
+    int inputSize = num_samples * input_channel * height_in * width_in * sizeof(float);
+    int outputSize = num_samples * output_channel * H_out * W_out * sizeof(float);
+    int maskSize = output_channel * input_channel * kernel_height * kernel_height * sizeof(float);
 
-    // Set the kernel dimensions and call the kernel
-    int height_grid = ceil(1.0 * height_out / TILE_WIDTH);
-    int width_grid = ceil(1.0 * width_out / TILE_WIDTH);
-    int Z = height_grid * width_grid;
-    dim3 num_threads_per_block(TILE_WIDTH, TILE_WIDTH, 1);
-    dim3 num_blocks_in_grid(num_samples, output_channel, Z);
+    float *device_input, *device_output, *device_kernel;
 
+    cudaMalloc((void **)&device_input, inputSize);
+    cudaMalloc((void **)&device_output, outputSize);
+    cudaMalloc((void **)&device_kernel, maskSize);
+
+    cudaMemcpy(device_input, input_data, inputSize, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(deviceMaskData, weight_data, maskSize);
+
+    dim3 numThreadsPerBlock, numBlocksInGrid;
+
+    int Z = ceil(1.0 * H_out / TILE_WIDTH) * ceil(1.0 * W_out / TILE_WIDTH);
+    numThreadsPerBlock = dim3(TILE_WIDTH, TILE_WIDTH, 1);
+    int shmem_size = input_channel * (TILE_WIDTH + kernel_height - 1) * (TILE_WIDTH + kernel_height - 1) * sizeof(float);
+    numBlocksInGrid = dim3(num_samples, output_channel, Z);
+    
     // Launch the kernel
-    conv_forward_kernel<<<num_blocks_in_grid, num_threads_per_block>>>(device_output, device_input, device_weight, num_samples, output_channel, input_channel, height_in, width_in, kernel_height);
+    conv_forward_kernel<<<numBlocksInGrid, numThreadsPerBlock, shmem_size>>>(device_output, device_input, device_kernel, num_samples, output_channel, input_channel, height_in, width_in, kernel_height);
 
     // Copy the output back to host
-    cudaMemcpy(output_data, device_output, num_samples * output_channel * height_out * width_out * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(output_data, device_output, outputSize, cudaMemcpyDeviceToHost);
 
-    // Free device memory
     cudaFree(device_input);
     cudaFree(device_output);
-    cudaFree(device_weight);
+    cudaFree(device_kernel);
+
 }

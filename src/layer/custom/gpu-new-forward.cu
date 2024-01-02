@@ -10,9 +10,6 @@ __global__ void conv_forward_kernel(float *output, const float *input, const flo
 {
     const int height_out = height - kernel_size + 1;
     const int width_out = width - kernel_size + 1;
-
-    int height_grid = ceil(1.0 * height_out / TILE_WIDTH);
-    int width_grid = ceil(1.0 * width_out / TILE_WIDTH); 
     
     int batch_idx = blockIdx.x;        // batch number
     int output_feature_idx = blockIdx.y; // output feature
@@ -69,9 +66,7 @@ __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const floa
     cudaMemcpy(device_weight, weight_data, output_channel * input_channel * kernel_height * kernel_height * sizeof(float), cudaMemcpyHostToDevice);
 
     // Set the kernel dimensions and call the kernel
-    int height_grid = ceil(1.0 * height_out / TILE_WIDTH);
-    int width_grid = ceil(1.0 * width_out / TILE_WIDTH);
-    int Z = height_grid * width_grid;
+    int Z = ceil(1.0 * height_out / TILE_WIDTH) * ceil(1.0 * width_out / TILE_WIDTH);
     dim3 num_threads_per_block(TILE_WIDTH, TILE_WIDTH, 1);
     dim3 num_blocks_in_grid(num_samples, output_channel, Z);
 
