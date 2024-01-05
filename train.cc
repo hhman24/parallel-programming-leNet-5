@@ -90,9 +90,8 @@ int main()
         dnn.check_gradient(x_batch, target_batch, 10);
       }
       dnn.forward(x_batch);
-      std::cout << "forward done" << std::endl;
       dnn.backward(x_batch, target_batch);
-      std::cout << "backward done" << std::endl;
+    
       // display
       if (ith_batch % 50 == 0)
       {

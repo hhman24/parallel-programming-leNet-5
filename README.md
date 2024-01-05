@@ -1,4 +1,4 @@
-# parallel-programming-leNet-5
+# Parallel Programming - Lenet 5 CUDA 
 Parallel Programming Final Project #HCMUS #CNN #LeNet-5
 
 # Member
@@ -21,7 +21,7 @@ We will use the Fashion MNIST dataset, where the inputs to the network will be a
 The overall learning objectives for this project are:
  - Demonstrating command of CUDA and optimization approaches by designing and implementing an optimized neural-network convolutional layer forward pass
 
-# Usage
+# Test model
 ### Linux
 ```shell
 git clone https://github.com/hhman24/parallel-programming-leNet-5
@@ -30,6 +30,16 @@ make clean
 make setup
 make custom0
 make test_model
+```
+
+# Train model
+```shell
+git clone https://github.com/hhman24/parallel-programming-leNet-5
+cd parallel-programming-leNet-5
+make clean
+make setup
+make custom0
+make train_model
 ```
 
 #  Background knowledge
