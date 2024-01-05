@@ -4,7 +4,6 @@
 #include <vector>
 #include <chrono>
 #include "../layer.h"
-#include "./custom/gpu-support.h"
 #include "./custom/gpu-new-forward.h"
 
 

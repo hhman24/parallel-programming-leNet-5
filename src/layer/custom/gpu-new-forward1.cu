@@ -54,6 +54,7 @@ __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const floa
                                                   const int num_samples, const int output_channel, const int input_channel,
                                                   const int height_in, const int width_in, const int kernel_height)
 {
+    std::cout << ". Optimization 1 - Const memory:\n";
     const int height_out = height_in - kernel_height + 1;
     const int width_out = width_in - kernel_height + 1;
 
@@ -72,7 +73,12 @@ __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const floa
     dim3 num_blocks_in_grid(num_samples, output_channel, Z);
 
     // Launch the kernel
+    GpuTimer time_kernel;
+	time_kernel.Start();
     conv_forward_kernel<<<num_blocks_in_grid, num_threads_per_block>>>(device_output, device_input, num_samples, output_channel, input_channel, height_in, width_in, kernel_height);
+    time_kernel.Stop();
+    float time_kernel_ms = time_kernel.Elapsed();
+    std::cout << "\t - Kernel Time: " << time_kernel_ms << " ms" << std::endl;
 
     // Copy the output back to host
     cudaMemcpy(output_data, device_output, num_samples * output_channel * height_out * width_out * sizeof(float), cudaMemcpyDeviceToHost);

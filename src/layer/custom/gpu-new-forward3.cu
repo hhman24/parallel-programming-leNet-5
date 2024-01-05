@@ -90,6 +90,7 @@ __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const floa
                                                   const int num_samples, const int output_channel, const int input_channel,
                                                   const int height_in, const int width_in, const int kernel_height)
 {
+    std::cout << ". Optimization 3 - Const and shared memory:\n";
     // Set the tile width
     int TILE_WIDTH;    
     if (input_channel == 1){
@@ -98,7 +99,6 @@ __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const floa
     else{
         TILE_WIDTH = TILE_WIDTH_C3;
     }
-    std::cout << ". Optimize 02:\n";
 
     // Allocate memory and copy over the relevant data structures to the GPU
     const int H_out = height_in - kernel_height + 1;
@@ -125,8 +125,13 @@ __host__ void GPUInterface::conv_forward_gpu_full(float *output_data, const floa
     numBlocksInGrid = dim3(num_samples, output_channel, Z);
     
     // Launch the kernel
+    GpuTimer time_kernel;
+	time_kernel.Start();
     conv_forward_kernel<<<numBlocksInGrid, numThreadsPerBlock, shmem_size>>>(device_output, device_input, device_kernel, num_samples, output_channel, input_channel, height_in, width_in, kernel_height);
-
+    time_kernel.Stop();
+    float time_kernel_taken = time_kernel.Elapsed();
+    std::cout << "\t - Kernel Time: " << time_kernel_taken << " ms\n";
+    
     // Copy the output back to host
     cudaMemcpy(output_data, device_output, outputSize, cudaMemcpyDeviceToHost);
 
