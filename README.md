@@ -22,6 +22,7 @@ The overall learning objectives for this project are:
  - Demonstrating command of CUDA and optimization approaches by designing and implementing an optimized neural-network convolutional layer forward pass
 
 # Test model
+Video hướng dẫn chạy demo: [Youtube](https://youtu.be/A27ISIaLZAk?si=rHJaWxYKYCHM3bnh)
 ### Linux
 ```shell
 git clone https://github.com/hhman24/parallel-programming-leNet-5
